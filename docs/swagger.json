@@ -217,15 +217,53 @@
             }
         },
         "/documents": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all documents for the authenticated user's company",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Get all company documents",
+                "responses": {
+                    "200": {
+                        "description": "List of company documents",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Document"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new document for the authenticated user's company and return a hash for later verification",
+                "description": "Create a new document for the authenticated user's company with PDF file attachment",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -236,13 +274,39 @@
                 "summary": "Create a document",
                 "parameters": [
                     {
-                        "description": "Document data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/entity.CreateDocumentRequest"
-                        }
+                        "type": "string",
+                        "description": "Document type",
+                        "name": "type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Document name",
+                        "name": "name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Document summary",
+                        "name": "summary",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Expiration date (RFC3339 format)",
+                        "name": "expiration_date",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "PDF file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -370,6 +434,64 @@
                     },
                     "404": {
                         "description": "Document not found",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/documents/{id}/file": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Download the PDF file attached to a document. Only employees from the same company can access.",
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Download document file",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PDF file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid document ID",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Document or file not found",
                         "schema": {
                             "$ref": "#/definitions/errs.Error"
                         }
@@ -844,34 +966,6 @@
                 }
             }
         },
-        "entity.CreateDocumentRequest": {
-            "description": "Request to create a new document",
-            "type": "object",
-            "required": [
-                "expiration_date",
-                "name",
-                "summary",
-                "type"
-            ],
-            "properties": {
-                "expiration_date": {
-                    "type": "string",
-                    "example": "2025-12-31T00:00:00Z"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Employment Agreement"
-                },
-                "summary": {
-                    "type": "string",
-                    "example": "Standard employment agreement for full-time employees"
-                },
-                "type": {
-                    "type": "string",
-                    "example": "agreement"
-                }
-            }
-        },
         "entity.CreateDocumentResponse": {
             "description": "Response containing the document hash for later retrieval",
             "type": "object",
@@ -893,6 +987,10 @@
                 "expiration_date": {
                     "type": "string",
                     "example": "2025-12-31T00:00:00Z"
+                },
+                "file_name": {
+                    "type": "string",
+                    "example": "contract.pdf"
                 },
                 "id": {
                     "type": "integer",

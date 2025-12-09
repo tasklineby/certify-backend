@@ -34,27 +34,6 @@ definitions:
     - admin
     - company_name
     type: object
-  entity.CreateDocumentRequest:
-    description: Request to create a new document
-    properties:
-      expiration_date:
-        example: "2025-12-31T00:00:00Z"
-        type: string
-      name:
-        example: Employment Agreement
-        type: string
-      summary:
-        example: Standard employment agreement for full-time employees
-        type: string
-      type:
-        example: agreement
-        type: string
-    required:
-    - expiration_date
-    - name
-    - summary
-    - type
-    type: object
   entity.CreateDocumentResponse:
     description: Response containing the document hash for later retrieval
     properties:
@@ -70,6 +49,9 @@ definitions:
         type: integer
       expiration_date:
         example: "2025-12-31T00:00:00Z"
+        type: string
+      file_name:
+        example: contract.pdf
         type: string
       id:
         example: 1
@@ -411,18 +393,61 @@ paths:
       tags:
       - auth
   /documents:
+    get:
+      description: Get all documents for the authenticated user's company
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of company documents
+          schema:
+            items:
+              $ref: '#/definitions/entity.Document'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/errs.Error'
+      security:
+      - BearerAuth: []
+      summary: Get all company documents
+      tags:
+      - documents
     post:
       consumes:
-      - application/json
-      description: Create a new document for the authenticated user's company and
-        return a hash for later verification
+      - multipart/form-data
+      description: Create a new document for the authenticated user's company with
+        PDF file attachment
       parameters:
-      - description: Document data
-        in: body
-        name: request
+      - description: Document type
+        in: formData
+        name: type
         required: true
-        schema:
-          $ref: '#/definitions/entity.CreateDocumentRequest'
+        type: string
+      - description: Document name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Document summary
+        in: formData
+        name: summary
+        required: true
+        type: string
+      - description: Expiration date (RFC3339 format)
+        in: formData
+        name: expiration_date
+        required: true
+        type: string
+      - description: PDF file
+        in: formData
+        name: file
+        required: true
+        type: file
       produces:
       - application/json
       responses:
@@ -483,6 +508,44 @@ paths:
       security:
       - BearerAuth: []
       summary: Get document by ID
+      tags:
+      - documents
+  /documents/{id}/file:
+    get:
+      description: Download the PDF file attached to a document. Only employees from
+        the same company can access.
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: PDF file
+          schema:
+            type: file
+        "400":
+          description: Invalid document ID
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "404":
+          description: Document or file not found
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/errs.Error'
+      security:
+      - BearerAuth: []
+      summary: Download document file
       tags:
       - documents
   /documents/verify:

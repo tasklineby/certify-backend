@@ -103,6 +103,8 @@ type Document struct {
 	Summary        string    `db:"summary" json:"summary" example:"Standard employment agreement for full-time employees"`
 	ExpirationDate time.Time `db:"expiration_date" json:"expiration_date" example:"2025-12-31T00:00:00Z"`
 	ScanCount      int       `db:"scan_count" json:"scan_count" example:"42"`
+	FileName       string    `db:"file_name" json:"file_name" example:"contract.pdf"`
+	FileData       []byte    `db:"file_data" json:"-"`
 }
 
 // VerificationHistory represents a document verification history entry

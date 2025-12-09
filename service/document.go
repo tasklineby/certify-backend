@@ -19,8 +19,9 @@ const (
 )
 
 type DocumentService interface {
-	CreateDocument(ctx context.Context, req entity.CreateDocumentRequest, companyID int) (string, error)
+	CreateDocument(ctx context.Context, req entity.CreateDocumentRequest, companyID int, fileName string, fileData []byte) (string, error)
 	GetDocumentByID(ctx context.Context, id, requesterCompanyID int) (*entity.Document, error)
+	GetDocumentsByCompanyID(ctx context.Context, companyID int) ([]entity.Document, error)
 	VerifyDocument(ctx context.Context, hash string, requesterCompanyID, userID int) (*entity.Document, entity.DocumentStatus, string, error)
 	GetHistory(ctx context.Context, userID int) ([]entity.VerificationHistory, error)
 }
@@ -38,13 +39,15 @@ func NewDocumentService(documentRepo pg.DocumentRepository, historyRepo pg.Histo
 }
 
 // CreateDocument creates a new document and returns its hash
-func (s *documentService) CreateDocument(ctx context.Context, req entity.CreateDocumentRequest, companyID int) (string, error) {
+func (s *documentService) CreateDocument(ctx context.Context, req entity.CreateDocumentRequest, companyID int, fileName string, fileData []byte) (string, error) {
 	doc := &entity.Document{
 		CompanyID:      companyID,
 		Type:           req.Type,
 		Name:           req.Name,
 		Summary:        req.Summary,
 		ExpirationDate: req.ExpirationDate,
+		FileName:       fileName,
+		FileData:       fileData,
 	}
 
 	err := s.documentRepo.CreateDocument(ctx, doc)
@@ -89,6 +92,16 @@ func (s *documentService) GetDocumentByID(ctx context.Context, id, requesterComp
 	}
 
 	return &doc, nil
+}
+
+// GetDocumentsByCompanyID returns all documents for a company
+func (s *documentService) GetDocumentsByCompanyID(ctx context.Context, companyID int) ([]entity.Document, error) {
+	docs, err := s.documentRepo.GetDocumentsByCompanyID(ctx, companyID)
+	if err != nil {
+		slog.Error("error getting documents by company", "err", err)
+		return nil, errs.InternalError("error getting documents", err)
+	}
+	return docs, nil
 }
 
 // VerifyDocument verifies a document by its hash and returns the full document with status

@@ -46,9 +46,11 @@ func InitRoutes(
 
 	// Document routes (protected - only company employees can access)
 	protectedDocumentApi := protected.Group("/documents")
+	protectedDocumentApi.GET("", documentHandler.GetCompanyDocuments)
 	protectedDocumentApi.POST("", documentHandler.CreateDocument)
 	protectedDocumentApi.GET("/verify", documentHandler.VerifyDocument)
 	protectedDocumentApi.GET("/:id", documentHandler.GetDocument)
+	protectedDocumentApi.GET("/:id/file", documentHandler.DownloadFile)
 
 	// History routes (protected)
 	protected.GET("/history", documentHandler.GetHistory)
