@@ -92,3 +92,54 @@ type UpdateUserRequest struct {
 	LastName  *string `json:"last_name" example:"Doe"`
 	Email     *string `json:"email" binding:"omitempty,email" example:"newemail@example.com"`
 }
+
+// Document represents a document entity
+// @Description Document entity with type, name, summary and expiration date
+type Document struct {
+	ID             int       `db:"id" json:"id" example:"1"`
+	CompanyID      int       `db:"company_id" json:"company_id" example:"1"`
+	Type           string    `db:"type" json:"type" example:"agreement"`
+	Name           string    `db:"name" json:"name" example:"Employment Agreement"`
+	Summary        string    `db:"summary" json:"summary" example:"Standard employment agreement for full-time employees"`
+	ExpirationDate time.Time `db:"expiration_date" json:"expiration_date" example:"2025-12-31T00:00:00Z"`
+}
+
+// DocumentStatus represents the status of a document based on expiration
+type DocumentStatus string
+
+const (
+	DocumentStatusGreen  DocumentStatus = "green"  // Document is valid
+	DocumentStatusYellow DocumentStatus = "yellow" // Document will expire soon (within 30 days)
+	DocumentStatusRed    DocumentStatus = "red"    // Document is expired or not found
+)
+
+// CreateDocumentRequest represents request to create a document
+// @Description Request to create a new document
+type CreateDocumentRequest struct {
+	Type           string    `json:"type" binding:"required" example:"agreement"`
+	Name           string    `json:"name" binding:"required" example:"Employment Agreement"`
+	Summary        string    `json:"summary" binding:"required" example:"Standard employment agreement for full-time employees"`
+	ExpirationDate time.Time `json:"expiration_date" binding:"required" example:"2025-12-31T00:00:00Z"`
+}
+
+// CreateDocumentResponse represents response after creating a document
+// @Description Response containing the document hash for later retrieval
+type CreateDocumentResponse struct {
+	Hash string `json:"hash" example:"eyJpZCI6MSwidHlwZSI6ImFncmVlbWVudCIsIm5hbWUiOiJFbXBsb3ltZW50IEFncmVlbWVudCJ9"`
+}
+
+// VerifyDocumentResponse represents response with document details and status
+// @Description Response containing full document details and verification status
+type VerifyDocumentResponse struct {
+	Document *Document      `json:"document"`
+	Status   DocumentStatus `json:"status" example:"green"`
+	Message  string         `json:"message" example:"Document is valid"`
+}
+
+// DocumentHashPayload represents the payload encoded in the document hash
+type DocumentHashPayload struct {
+	ID        int    `json:"id"`
+	CompanyID int    `json:"company_id"`
+	Type      string `json:"type"`
+	Name      string `json:"name"`
+}

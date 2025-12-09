@@ -72,6 +72,7 @@ func main() {
 
 	userRepo := pg.NewUserRepository(dbConn)
 	companyRepo := pg.NewCompanyRepository(dbConn)
+	documentRepo := pg.NewDocumentRepository(dbConn)
 	tokenRepo := rdb.NewTokenRepository(redisClient)
 
 	jwtService := service.NewJwtService(
@@ -81,11 +82,13 @@ func main() {
 	)
 	userService := service.NewUserService(userRepo, companyRepo)
 	authService := service.NewAuthService(userService, tokenRepo, jwtService)
+	documentService := service.NewDocumentService(documentRepo)
 
 	userHandler := handlers.NewUserHandler(userService, jwtService, tokenRepo)
 	authHandler := handlers.NewAuthHandler(authService)
+	documentHandler := handlers.NewDocumentHandler(documentService)
 
-	router := handlers.InitRoutes(userHandler, authHandler, authService)
+	router := handlers.InitRoutes(userHandler, authHandler, documentHandler, authService)
 	server := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
 		Handler: router,

@@ -11,6 +11,7 @@ import (
 func InitRoutes(
 	userHandler *UserHandler,
 	authHandler *AuthHandler,
+	documentHandler *DocumentHandler,
 	authService service.AuthService,
 ) *gin.Engine {
 	router := gin.New()
@@ -42,6 +43,11 @@ func InitRoutes(
 	protectedUserApi.PUT("/:id", userHandler.UpdateUser)
 	protectedUserApi.DELETE("/:id", userHandler.DeleteUser)
 	protectedUserApi.GET("/company", userHandler.GetUsersByCompany)
+
+	// Document routes (protected - only company employees can access)
+	protectedDocumentApi := protected.Group("/documents")
+	protectedDocumentApi.POST("", documentHandler.CreateDocument)
+	protectedDocumentApi.GET("/verify", documentHandler.VerifyDocument)
 
 	// Swagger documentation - accessible at /swagger/index.html
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))

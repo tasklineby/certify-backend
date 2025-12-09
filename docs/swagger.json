@@ -216,6 +216,115 @@
                 }
             }
         },
+        "/documents": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new document for the authenticated user's company and return a hash for later verification",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Create a document",
+                "parameters": [
+                    {
+                        "description": "Document data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/entity.CreateDocumentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Document created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/entity.CreateDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/documents/verify": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Verify a document using its hash from query parameter and get full details with expiration status. Only employees from the same company can verify.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Verify a document by hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Document hash",
+                        "name": "hash",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Document verification result",
+                        "schema": {
+                            "$ref": "#/definitions/entity.VerifyDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or hash",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/user/company": {
             "get": {
                 "security": [
@@ -637,6 +746,97 @@
                 }
             }
         },
+        "entity.CreateDocumentRequest": {
+            "description": "Request to create a new document",
+            "type": "object",
+            "required": [
+                "expiration_date",
+                "name",
+                "summary",
+                "type"
+            ],
+            "properties": {
+                "expiration_date": {
+                    "type": "string",
+                    "example": "2025-12-31T00:00:00Z"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Employment Agreement"
+                },
+                "summary": {
+                    "type": "string",
+                    "example": "Standard employment agreement for full-time employees"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "agreement"
+                }
+            }
+        },
+        "entity.CreateDocumentResponse": {
+            "description": "Response containing the document hash for later retrieval",
+            "type": "object",
+            "properties": {
+                "hash": {
+                    "type": "string",
+                    "example": "eyJpZCI6MSwidHlwZSI6ImFncmVlbWVudCIsIm5hbWUiOiJFbXBsb3ltZW50IEFncmVlbWVudCJ9"
+                }
+            }
+        },
+        "entity.Document": {
+            "description": "Document entity with type, name, summary and expiration date",
+            "type": "object",
+            "properties": {
+                "company_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "expiration_date": {
+                    "type": "string",
+                    "example": "2025-12-31T00:00:00Z"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Employment Agreement"
+                },
+                "summary": {
+                    "type": "string",
+                    "example": "Standard employment agreement for full-time employees"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "agreement"
+                }
+            }
+        },
+        "entity.DocumentStatus": {
+            "type": "string",
+            "enum": [
+                "green",
+                "yellow",
+                "red"
+            ],
+            "x-enum-comments": {
+                "DocumentStatusGreen": "Document is valid",
+                "DocumentStatusRed": "Document is expired or not found",
+                "DocumentStatusYellow": "Document will expire soon (within 30 days)"
+            },
+            "x-enum-descriptions": [
+                "Document is valid",
+                "Document will expire soon (within 30 days)",
+                "Document is expired or not found"
+            ],
+            "x-enum-varnames": [
+                "DocumentStatusGreen",
+                "DocumentStatusYellow",
+                "DocumentStatusRed"
+            ]
+        },
         "entity.LoginRequest": {
             "description": "Login credentials",
             "type": "object",
@@ -769,6 +969,27 @@
                 "updated_at": {
                     "type": "string",
                     "example": "2024-01-01T00:00:00Z"
+                }
+            }
+        },
+        "entity.VerifyDocumentResponse": {
+            "description": "Response containing full document details and verification status",
+            "type": "object",
+            "properties": {
+                "document": {
+                    "$ref": "#/definitions/entity.Document"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Document is valid"
+                },
+                "status": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.DocumentStatus"
+                        }
+                    ],
+                    "example": "green"
                 }
             }
         },

@@ -32,7 +32,7 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req entity.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("invalid request", err))
 		return
 	}
 
@@ -61,7 +61,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req entity.RegisterEmployeeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("invalid request", err))
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req entity.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("invalid request", err))
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Authorization header required"})
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("authorization header required", nil))
 		return
 	}
 
@@ -126,7 +126,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	var req entity.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("invalid request", err))
 		return
 	}
 
