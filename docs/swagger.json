@@ -280,7 +280,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Verify a document using its hash from query parameter and get full details with expiration status. Only employees from the same company can verify.",
+                "description": "Verify a document using its hash from query parameter and get full details with expiration status. Only employees from the same company can verify. Each verification is recorded in history.",
                 "produces": [
                     "application/json"
                 ],
@@ -308,6 +308,104 @@
                         "description": "Invalid request or hash",
                         "schema": {
                             "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/documents/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a document by its ID. Only employees from the same company can access.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Get document by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Document ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Document details",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Document"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid document ID",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the authenticated user's document verification history",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Get verification history",
+                "responses": {
+                    "200": {
+                        "description": "Verification history",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.VerificationHistory"
+                            }
                         }
                     },
                     "401": {
@@ -804,6 +902,10 @@
                     "type": "string",
                     "example": "Employment Agreement"
                 },
+                "scan_count": {
+                    "type": "integer",
+                    "example": 42
+                },
                 "summary": {
                     "type": "string",
                     "example": "Standard employment agreement for full-time employees"
@@ -969,6 +1071,40 @@
                 "updated_at": {
                     "type": "string",
                     "example": "2024-01-01T00:00:00Z"
+                }
+            }
+        },
+        "entity.VerificationHistory": {
+            "description": "Record of a document verification attempt",
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Document is valid"
+                },
+                "scanned_at": {
+                    "type": "string",
+                    "example": "2024-01-01T12:00:00Z"
+                },
+                "status": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.DocumentStatus"
+                        }
+                    ],
+                    "example": "green"
+                },
+                "user_id": {
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },

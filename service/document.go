@@ -20,16 +20,20 @@ const (
 
 type DocumentService interface {
 	CreateDocument(ctx context.Context, req entity.CreateDocumentRequest, companyID int) (string, error)
-	VerifyDocument(ctx context.Context, hash string, requesterCompanyID int) (*entity.Document, entity.DocumentStatus, string, error)
+	GetDocumentByID(ctx context.Context, id, requesterCompanyID int) (*entity.Document, error)
+	VerifyDocument(ctx context.Context, hash string, requesterCompanyID, userID int) (*entity.Document, entity.DocumentStatus, string, error)
+	GetHistory(ctx context.Context, userID int) ([]entity.VerificationHistory, error)
 }
 
 type documentService struct {
 	documentRepo pg.DocumentRepository
+	historyRepo  pg.HistoryRepository
 }
 
-func NewDocumentService(documentRepo pg.DocumentRepository) DocumentService {
+func NewDocumentService(documentRepo pg.DocumentRepository, historyRepo pg.HistoryRepository) DocumentService {
 	return &documentService{
 		documentRepo: documentRepo,
+		historyRepo:  historyRepo,
 	}
 }
 
@@ -68,8 +72,27 @@ func (s *documentService) CreateDocument(ctx context.Context, req entity.CreateD
 	return hash, nil
 }
 
+// GetDocumentByID returns a document by its ID (only if requester belongs to the same company)
+func (s *documentService) GetDocumentByID(ctx context.Context, id, requesterCompanyID int) (*entity.Document, error) {
+	doc, err := s.documentRepo.GetDocumentByID(ctx, id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errs.NotFoundError("document", err)
+		}
+		slog.Error("error getting document", "err", err)
+		return nil, errs.InternalError("error getting document", err)
+	}
+
+	// Check if requester belongs to the same company as the document
+	if doc.CompanyID != requesterCompanyID {
+		return nil, errs.UnauthorizedError("access denied: you can only access documents from your own company", nil)
+	}
+
+	return &doc, nil
+}
+
 // VerifyDocument verifies a document by its hash and returns the full document with status
-func (s *documentService) VerifyDocument(ctx context.Context, hash string, requesterCompanyID int) (*entity.Document, entity.DocumentStatus, string, error) {
+func (s *documentService) VerifyDocument(ctx context.Context, hash string, requesterCompanyID, userID int) (*entity.Document, entity.DocumentStatus, string, error) {
 	// Decode hash
 	payloadBytes, err := base64.URLEncoding.DecodeString(hash)
 	if err != nil {
@@ -103,7 +126,36 @@ func (s *documentService) VerifyDocument(ctx context.Context, hash string, reque
 	now := time.Now()
 	status, message := s.getDocumentStatus(doc.ExpirationDate, now)
 
+	// Increment scan count
+	if err := s.documentRepo.IncrementScanCount(ctx, doc.ID); err != nil {
+		slog.Error("error incrementing scan count", "err", err)
+		// Don't fail the verification, just log the error
+	}
+	doc.ScanCount++ // Update local copy for response
+
+	// Record verification history
+	history := &entity.VerificationHistory{
+		UserID:     userID,
+		DocumentID: doc.ID,
+		Status:     status,
+		Message:    message,
+	}
+	if err := s.historyRepo.CreateHistory(ctx, history); err != nil {
+		slog.Error("error creating verification history", "err", err)
+		// Don't fail the verification, just log the error
+	}
+
 	return &doc, status, message, nil
+}
+
+// GetHistory returns verification history for a user
+func (s *documentService) GetHistory(ctx context.Context, userID int) ([]entity.VerificationHistory, error) {
+	history, err := s.historyRepo.GetHistoryByUserID(ctx, userID)
+	if err != nil {
+		slog.Error("error getting history", "err", err)
+		return nil, errs.InternalError("error getting history", err)
+	}
+	return history, nil
 }
 
 // getDocumentStatus determines the status and message based on expiration date

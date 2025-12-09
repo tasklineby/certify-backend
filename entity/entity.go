@@ -102,6 +102,18 @@ type Document struct {
 	Name           string    `db:"name" json:"name" example:"Employment Agreement"`
 	Summary        string    `db:"summary" json:"summary" example:"Standard employment agreement for full-time employees"`
 	ExpirationDate time.Time `db:"expiration_date" json:"expiration_date" example:"2025-12-31T00:00:00Z"`
+	ScanCount      int       `db:"scan_count" json:"scan_count" example:"42"`
+}
+
+// VerificationHistory represents a document verification history entry
+// @Description Record of a document verification attempt
+type VerificationHistory struct {
+	ID         int            `db:"id" json:"id" example:"1"`
+	UserID     int            `db:"user_id" json:"user_id" example:"1"`
+	DocumentID int            `db:"document_id" json:"document_id" example:"1"`
+	Status     DocumentStatus `db:"status" json:"status" example:"green"`
+	Message    string         `db:"message" json:"message" example:"Document is valid"`
+	ScannedAt  time.Time      `db:"scanned_at" json:"scanned_at" example:"2024-01-01T12:00:00Z"`
 }
 
 // DocumentStatus represents the status of a document based on expiration

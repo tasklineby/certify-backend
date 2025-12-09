@@ -33,6 +33,16 @@ func getCompanyIDFromContext(c *gin.Context) (int, error) {
 	return companyID, nil
 }
 
+// getUserIDFromContext extracts user_id from the gin context (set by auth middleware)
+func getUserIDFromContext(c *gin.Context) (int, error) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		return 0, errs.UnauthorizedError("user ID not found in context", nil)
+	}
+
+	return userID.(int), nil
+}
+
 // CreateDocument godoc
 // @Summary      Create a document
 // @Description  Create a new document for the authenticated user's company and return a hash for later verification
@@ -70,9 +80,47 @@ func (h *DocumentHandler) CreateDocument(c *gin.Context) {
 	c.JSON(http.StatusCreated, entity.CreateDocumentResponse{Hash: hash})
 }
 
+// GetDocument godoc
+// @Summary      Get document by ID
+// @Description  Get a document by its ID. Only employees from the same company can access.
+// @Tags         documents
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id        path      int  true  "Document ID"
+// @Success      200       {object}  entity.Document  "Document details"
+// @Failure      400       {object}  errs.Error       "Invalid document ID"
+// @Failure      401       {object}  errs.Error       "Unauthorized"
+// @Failure      404       {object}  errs.Error       "Document not found"
+// @Failure      500       {object}  errs.Error       "Internal server error"
+// @Router       /documents/{id} [get]
+func (h *DocumentHandler) GetDocument(c *gin.Context) {
+	companyID, err := getCompanyIDFromContext(c)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("invalid document ID", err))
+		return
+	}
+
+	doc, err := h.documentService.GetDocumentByID(c.Request.Context(), id, companyID)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	c.JSON(http.StatusOK, doc)
+}
+
 // VerifyDocument godoc
 // @Summary      Verify a document by hash
-// @Description  Verify a document using its hash from query parameter and get full details with expiration status. Only employees from the same company can verify.
+// @Description  Verify a document using its hash from query parameter and get full details with expiration status. Only employees from the same company can verify. Each verification is recorded in history.
 // @Tags         documents
 // @Produce      json
 // @Security     BearerAuth
@@ -90,13 +138,20 @@ func (h *DocumentHandler) VerifyDocument(c *gin.Context) {
 		return
 	}
 
+	userID, err := getUserIDFromContext(c)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
 	hash := c.Query("hash")
 	if hash == "" {
 		c.JSON(http.StatusBadRequest, errs.BadRequestError("hash query parameter is required", nil))
 		return
 	}
 
-	doc, status, message, err := h.documentService.VerifyDocument(c.Request.Context(), hash, companyID)
+	doc, status, message, err := h.documentService.VerifyDocument(c.Request.Context(), hash, companyID, userID)
 	if err != nil {
 		errCast := errs.ErrorCast(err)
 		c.JSON(errCast.StatusCode(), errCast)
@@ -108,4 +163,32 @@ func (h *DocumentHandler) VerifyDocument(c *gin.Context) {
 		Status:   status,
 		Message:  message,
 	})
+}
+
+// GetHistory godoc
+// @Summary      Get verification history
+// @Description  Get the authenticated user's document verification history
+// @Tags         documents
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200       {array}   entity.VerificationHistory  "Verification history"
+// @Failure      401       {object}  errs.Error                  "Unauthorized"
+// @Failure      500       {object}  errs.Error                  "Internal server error"
+// @Router       /history [get]
+func (h *DocumentHandler) GetHistory(c *gin.Context) {
+	userID, err := getUserIDFromContext(c)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	history, err := h.documentService.GetHistory(c.Request.Context(), userID)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	c.JSON(http.StatusOK, history)
 }

@@ -73,6 +73,7 @@ func main() {
 	userRepo := pg.NewUserRepository(dbConn)
 	companyRepo := pg.NewCompanyRepository(dbConn)
 	documentRepo := pg.NewDocumentRepository(dbConn)
+	historyRepo := pg.NewHistoryRepository(dbConn)
 	tokenRepo := rdb.NewTokenRepository(redisClient)
 
 	jwtService := service.NewJwtService(
@@ -82,7 +83,7 @@ func main() {
 	)
 	userService := service.NewUserService(userRepo, companyRepo)
 	authService := service.NewAuthService(userService, tokenRepo, jwtService)
-	documentService := service.NewDocumentService(documentRepo)
+	documentService := service.NewDocumentService(documentRepo, historyRepo)
 
 	userHandler := handlers.NewUserHandler(userService, jwtService, tokenRepo)
 	authHandler := handlers.NewAuthHandler(authService)

@@ -77,6 +77,9 @@ definitions:
       name:
         example: Employment Agreement
         type: string
+      scan_count:
+        example: 42
+        type: integer
       summary:
         example: Standard employment agreement for full-time employees
         type: string
@@ -200,6 +203,29 @@ definitions:
       updated_at:
         example: "2024-01-01T00:00:00Z"
         type: string
+    type: object
+  entity.VerificationHistory:
+    description: Record of a document verification attempt
+    properties:
+      document_id:
+        example: 1
+        type: integer
+      id:
+        example: 1
+        type: integer
+      message:
+        example: Document is valid
+        type: string
+      scanned_at:
+        example: "2024-01-01T12:00:00Z"
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/entity.DocumentStatus'
+        example: green
+      user_id:
+        example: 1
+        type: integer
     type: object
   entity.VerifyDocumentResponse:
     description: Response containing full document details and verification status
@@ -421,10 +447,49 @@ paths:
       summary: Create a document
       tags:
       - documents
+  /documents/{id}:
+    get:
+      description: Get a document by its ID. Only employees from the same company
+        can access.
+      parameters:
+      - description: Document ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Document details
+          schema:
+            $ref: '#/definitions/entity.Document'
+        "400":
+          description: Invalid document ID
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "404":
+          description: Document not found
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/errs.Error'
+      security:
+      - BearerAuth: []
+      summary: Get document by ID
+      tags:
+      - documents
   /documents/verify:
     get:
       description: Verify a document using its hash from query parameter and get full
         details with expiration status. Only employees from the same company can verify.
+        Each verification is recorded in history.
       parameters:
       - description: Document hash
         in: query
@@ -453,6 +518,31 @@ paths:
       security:
       - BearerAuth: []
       summary: Verify a document by hash
+      tags:
+      - documents
+  /history:
+    get:
+      description: Get the authenticated user's document verification history
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Verification history
+          schema:
+            items:
+              $ref: '#/definitions/entity.VerificationHistory'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/errs.Error'
+      security:
+      - BearerAuth: []
+      summary: Get verification history
       tags:
       - documents
   /user/{id}:

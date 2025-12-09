@@ -48,6 +48,10 @@ func InitRoutes(
 	protectedDocumentApi := protected.Group("/documents")
 	protectedDocumentApi.POST("", documentHandler.CreateDocument)
 	protectedDocumentApi.GET("/verify", documentHandler.VerifyDocument)
+	protectedDocumentApi.GET("/:id", documentHandler.GetDocument)
+
+	// History routes (protected)
+	protected.GET("/history", documentHandler.GetHistory)
 
 	// Swagger documentation - accessible at /swagger/index.html
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))

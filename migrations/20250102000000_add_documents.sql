@@ -7,6 +7,7 @@ CREATE TABLE documents (
     name VARCHAR(255) NOT NULL,
     summary TEXT NOT NULL,
     expiration_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    scan_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT fk_document_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
