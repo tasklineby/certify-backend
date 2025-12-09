@@ -25,6 +25,17 @@ func NewUserHandler(userService service.UserService, jwtService service.JwtServi
 	}
 }
 
+// CreateCompanyWithAdmin godoc
+// @Summary      Create company with admin
+// @Description  Create a new company and register its admin user. Returns access and refresh tokens for the admin.
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Param        request   body      entity.CreateCompanyRequest  true  "Company and admin data"
+// @Success      201       {object}  entity.TokenPair             "Company created, admin registered"
+// @Failure      400       {object}  errs.Error                   "Invalid request"
+// @Failure      409       {object}  errs.Error                   "Email already exists"
+// @Router       /user/company [post]
 func (h *UserHandler) CreateCompanyWithAdmin(c *gin.Context) {
 	var req entity.CreateCompanyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -42,6 +53,19 @@ func (h *UserHandler) CreateCompanyWithAdmin(c *gin.Context) {
 	c.JSON(http.StatusCreated, tokenPair)
 }
 
+// GetUser godoc
+// @Summary      Get user by ID
+// @Description  Get user profile information by user ID
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id        path      int            true  "User ID"
+// @Success      200       {object}  entity.User    "User profile"
+// @Failure      400       {object}  errs.Error     "Invalid user ID"
+// @Failure      401       {object}  errs.Error     "Unauthorized"
+// @Failure      404       {object}  errs.Error     "User not found"
+// @Router       /user/{id} [get]
 func (h *UserHandler) GetUser(c *gin.Context) {
 	userIDStr := c.Param("id")
 	userID, err := strconv.Atoi(userIDStr)
@@ -60,6 +84,17 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// GetMe godoc
+// @Summary      Get current user
+// @Description  Get the authenticated user's profile information
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200       {object}  entity.User      "User profile"
+// @Failure      401       {object}  errs.Error       "Unauthorized"
+// @Failure      404       {object}  errs.Error       "User not found"
+// @Router       /user/me [get]
 func (h *UserHandler) GetMe(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -77,6 +112,21 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// UpdateUser godoc
+// @Summary      Update user by ID
+// @Description  Update user profile information. Only admins can update other users from the same company.
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id        path      int                    true  "User ID"
+// @Param        request   body      entity.UpdateUserRequest  true  "User update data"
+// @Success      200       {object}  map[string]string      "User updated successfully"
+// @Failure      400       {object}  errs.Error             "Invalid request"
+// @Failure      401       {object}  errs.Error             "Unauthorized - only admins can update other users"
+// @Failure      404       {object}  errs.Error             "User not found"
+// @Failure      409       {object}  errs.Error             "Email already exists"
+// @Router       /user/{id} [put]
 func (h *UserHandler) UpdateUser(c *gin.Context) {
 	userIDStr := c.Param("id")
 	userID, err := strconv.Atoi(userIDStr)
@@ -120,6 +170,20 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User updated successfully"})
 }
 
+// UpdateMe godoc
+// @Summary      Update current user
+// @Description  Update the authenticated user's profile information
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request   body      entity.UpdateUserRequest  true  "User update data"
+// @Success      200       {object}  map[string]string         "User updated successfully"
+// @Failure      400       {object}  errs.Error               "Invalid request"
+// @Failure      401       {object}  errs.Error               "Unauthorized"
+// @Failure      404       {object}  errs.Error               "User not found"
+// @Failure      409       {object}  errs.Error               "Email already exists"
+// @Router       /user/me [put]
 func (h *UserHandler) UpdateMe(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -162,6 +226,19 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User updated successfully"})
 }
 
+// DeleteUser godoc
+// @Summary      Delete user by ID
+// @Description  Delete a user. Only admins can delete users from the same company.
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id        path      int                true  "User ID"
+// @Success      200       {object}  map[string]string  "User deleted successfully"
+// @Failure      400       {object}  errs.Error         "Invalid user ID"
+// @Failure      401       {object}  errs.Error         "Unauthorized - only admins can delete users"
+// @Failure      404       {object}  errs.Error         "User not found"
+// @Router       /user/{id} [delete]
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	userIDStr := c.Param("id")
 	userID, err := strconv.Atoi(userIDStr)
@@ -199,6 +276,17 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
 
+// GetUsersByCompany godoc
+// @Summary      Get users by company
+// @Description  Get all users from the authenticated user's company
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200       {array}   entity.User    "List of users"
+// @Failure      401       {object}  errs.Error     "Unauthorized"
+// @Failure      404       {object}  errs.Error     "Company not found"
+// @Router       /user/company [get]
 func (h *UserHandler) GetUsersByCompany(c *gin.Context) {
 	// Get company_id from token payload (set by middleware)
 	companyIDStr, exists := c.Get("company_id")

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/tasklineby/certify-backend/service"
 	"github.com/tasklineby/certify-backend/transport/rest/middleware"
 )
@@ -12,6 +14,7 @@ func InitRoutes(
 	authService service.AuthService,
 ) *gin.Engine {
 	router := gin.New()
+	router.Use(gin.Logger(), gin.Recovery())
 
 	// Public routes
 	api := router.Group("/api")
@@ -40,5 +43,7 @@ func InitRoutes(
 	protectedUserApi.DELETE("/:id", userHandler.DeleteUser)
 	protectedUserApi.GET("/company", userHandler.GetUsersByCompany)
 
+	// Swagger documentation - accessible at /swagger/index.html
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	return router
 }

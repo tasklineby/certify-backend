@@ -19,9 +19,11 @@ const (
 	ErrorTypeAlreadyExists ErrorType = "ALREADY_EXISTS"
 )
 
+// Error represents an API error response
+// @Description Error response structure
 type Error struct {
-	Type    ErrorType `json:"type"`
-	Message string    `json:"message"`
+	Type    ErrorType `json:"type" example:"VALIDATION_ERROR"`
+	Message string    `json:"message" example:"Error message"`
 	Err     error     `json:"-"`
 }
 
@@ -113,4 +115,3 @@ func ErrorCast(err error) Error {
 	}
 	return InternalError("internal server error", err)
 }
-
