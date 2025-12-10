@@ -157,3 +157,19 @@ type DocumentHashPayload struct {
 	Type      string `json:"type"`
 	Name      string `json:"name"`
 }
+
+// DocumentAnalysisResult represents the result of document comparison analysis
+// @Description Analysis result comparing uploaded document/photos with original
+type DocumentAnalysisResult struct {
+	Score   float64 `json:"score" example:"0.95"`
+	Message string  `json:"message" example:"Documents match with 95% confidence"`
+}
+
+// CompareDocumentResponse represents the response for document comparison
+// @Description Response containing document verification status, details and analysis result
+type CompareDocumentResponse struct {
+	Status   DocumentStatus          `json:"status" example:"green"`
+	Message  string                  `json:"message" example:"Document is valid"`
+	Document *Document               `json:"document"`
+	Analysis *DocumentAnalysisResult `json:"analysis,omitempty"`
+}

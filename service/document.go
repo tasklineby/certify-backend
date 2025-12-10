@@ -23,6 +23,8 @@ type DocumentService interface {
 	GetDocumentByID(ctx context.Context, id, requesterCompanyID int) (*entity.Document, error)
 	GetDocumentsByCompanyID(ctx context.Context, companyID int) ([]entity.Document, error)
 	VerifyDocument(ctx context.Context, hash string, requesterCompanyID, userID int) (*entity.Document, entity.DocumentStatus, string, error)
+	CompareWithPhotos(ctx context.Context, hash string, userID, requesterCompanyID int, photos [][]byte) (*entity.Document, entity.DocumentStatus, string, *entity.DocumentAnalysisResult, error)
+	CompareWithPDF(ctx context.Context, hash string, userID, requesterCompanyID int, pdfData []byte) (*entity.Document, entity.DocumentStatus, string, *entity.DocumentAnalysisResult, error)
 	GetHistory(ctx context.Context, userID int) ([]entity.VerificationHistory, error)
 }
 
@@ -183,4 +185,88 @@ func (s *documentService) getDocumentStatus(expirationDate, now time.Time) (enti
 	}
 
 	return entity.DocumentStatusGreen, "Document is valid"
+}
+
+// CompareWithPhotos compares a document with uploaded photos
+func (s *documentService) CompareWithPhotos(ctx context.Context, hash string, userID, requesterCompanyID int, photos [][]byte) (*entity.Document, entity.DocumentStatus, string, *entity.DocumentAnalysisResult, error) {
+	// Verify document first
+	doc, status, message, err := s.VerifyDocument(ctx, hash, requesterCompanyID, userID)
+	if err != nil {
+		return nil, entity.DocumentStatusRed, message, nil, err
+	}
+
+	// If document status is red, don't send to external service
+	if status == entity.DocumentStatusRed {
+		return doc, status, message, nil, nil
+	}
+
+	// Send to external analysis server
+	analysis, err := analyzeDocumentWithPhotos(doc.FileData, photos)
+	if err != nil {
+		slog.Error("error analyzing document with photos", "err", err)
+		return nil, entity.DocumentStatusRed, "Error analyzing document", nil, errs.InternalError("error analyzing document", err)
+	}
+
+	return doc, status, message, analysis, nil
+}
+
+// CompareWithPDF compares a document with an uploaded PDF
+func (s *documentService) CompareWithPDF(ctx context.Context, hash string, userID, requesterCompanyID int, pdfData []byte) (*entity.Document, entity.DocumentStatus, string, *entity.DocumentAnalysisResult, error) {
+	// Verify document first
+	doc, status, message, err := s.VerifyDocument(ctx, hash, requesterCompanyID, userID)
+	if err != nil {
+		return nil, entity.DocumentStatusRed, message, nil, err
+	}
+
+	// If document status is red, don't send to external service
+	if status == entity.DocumentStatusRed {
+		return doc, status, message, nil, nil
+	}
+
+	// Send to external analysis server
+	analysis, err := analyzeDocumentWithPDF(doc.FileData, pdfData)
+	if err != nil {
+		slog.Error("error analyzing document with PDF", "err", err)
+		return nil, entity.DocumentStatusRed, "Error analyzing document", nil, errs.InternalError("error analyzing document", err)
+	}
+
+	return doc, status, message, analysis, nil
+}
+
+// analyzeDocumentWithPhotos is a mock function that simulates sending document and photos to an external server
+// TODO: Replace with actual external API call
+func analyzeDocumentWithPhotos(originalPDF []byte, photos [][]byte) (*entity.DocumentAnalysisResult, error) {
+	// Mock implementation - in real scenario, this would:
+	// 1. Send originalPDF and photos to an external analysis server
+	// 2. The server would compare the photos with the original document
+	// 3. Return similarity score and detailed message
+
+	slog.Info("mock: analyzing document with photos",
+		"original_size", len(originalPDF),
+		"photo_count", len(photos))
+
+	// Simulate analysis result
+	return &entity.DocumentAnalysisResult{
+		Score:   0.92,
+		Message: "Documents match with 92% confidence. Minor differences detected in formatting.",
+	}, nil
+}
+
+// analyzeDocumentWithPDF is a mock function that simulates sending two PDFs to an external server for comparison
+// TODO: Replace with actual external API call
+func analyzeDocumentWithPDF(originalPDF []byte, uploadedPDF []byte) (*entity.DocumentAnalysisResult, error) {
+	// Mock implementation - in real scenario, this would:
+	// 1. Send both PDFs to an external analysis server
+	// 2. The server would compare the documents
+	// 3. Return similarity score and detailed message
+
+	slog.Info("mock: analyzing document with PDF",
+		"original_size", len(originalPDF),
+		"uploaded_size", len(uploadedPDF))
+
+	// Simulate analysis result
+	return &entity.DocumentAnalysisResult{
+		Score:   0.98,
+		Message: "Documents match with 98% confidence. Documents are nearly identical.",
+	}, nil
 }

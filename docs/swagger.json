@@ -337,6 +337,142 @@
                 }
             }
         },
+        "/documents/compare/pdf": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Compare a document with an uploaded PDF file. Sends both documents to analysis server.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Compare document with PDF",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Document hash",
+                        "name": "hash",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "PDF file to compare",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comparison result",
+                        "schema": {
+                            "$ref": "#/definitions/entity.CompareDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            }
+        },
+        "/documents/compare/photos": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Compare a document with uploaded photos. Sends original document and photos to analysis server.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "documents"
+                ],
+                "summary": "Compare document with photos",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Document hash",
+                        "name": "hash",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Photos of the document (multiple files allowed)",
+                        "name": "photos",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comparison result",
+                        "schema": {
+                            "$ref": "#/definitions/entity.CompareDocumentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/errs.Error"
+                        }
+                    }
+                }
+            }
+        },
         "/documents/verify": {
             "get": {
                 "security": [
@@ -949,6 +1085,30 @@
                 }
             }
         },
+        "entity.CompareDocumentResponse": {
+            "description": "Response containing document verification status, details and analysis result",
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "$ref": "#/definitions/entity.DocumentAnalysisResult"
+                },
+                "document": {
+                    "$ref": "#/definitions/entity.Document"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Document is valid"
+                },
+                "status": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/entity.DocumentStatus"
+                        }
+                    ],
+                    "example": "green"
+                }
+            }
+        },
         "entity.CreateCompanyRequest": {
             "description": "Request to create a company and register its admin",
             "type": "object",
@@ -1011,6 +1171,20 @@
                 "type": {
                     "type": "string",
                     "example": "agreement"
+                }
+            }
+        },
+        "entity.DocumentAnalysisResult": {
+            "description": "Analysis result comparing uploaded document/photos with original",
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Documents match with 95% confidence"
+                },
+                "score": {
+                    "type": "number",
+                    "example": 0.95
                 }
             }
         },

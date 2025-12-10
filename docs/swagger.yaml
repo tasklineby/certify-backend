@@ -22,6 +22,22 @@ definitions:
     - last_name
     - password
     type: object
+  entity.CompareDocumentResponse:
+    description: Response containing document verification status, details and analysis
+      result
+    properties:
+      analysis:
+        $ref: '#/definitions/entity.DocumentAnalysisResult'
+      document:
+        $ref: '#/definitions/entity.Document'
+      message:
+        example: Document is valid
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/entity.DocumentStatus'
+        example: green
+    type: object
   entity.CreateCompanyRequest:
     description: Request to create a company and register its admin
     properties:
@@ -68,6 +84,16 @@ definitions:
       type:
         example: agreement
         type: string
+    type: object
+  entity.DocumentAnalysisResult:
+    description: Analysis result comparing uploaded document/photos with original
+    properties:
+      message:
+        example: Documents match with 95% confidence
+        type: string
+      score:
+        example: 0.95
+        type: number
     type: object
   entity.DocumentStatus:
     enum:
@@ -546,6 +572,96 @@ paths:
       security:
       - BearerAuth: []
       summary: Download document file
+      tags:
+      - documents
+  /documents/compare/pdf:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Compare a document with an uploaded PDF file. Sends both documents
+        to analysis server.
+      parameters:
+      - description: Document hash
+        in: formData
+        name: hash
+        required: true
+        type: string
+      - description: PDF file to compare
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Comparison result
+          schema:
+            $ref: '#/definitions/entity.CompareDocumentResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "404":
+          description: Document not found
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/errs.Error'
+      security:
+      - BearerAuth: []
+      summary: Compare document with PDF
+      tags:
+      - documents
+  /documents/compare/photos:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Compare a document with uploaded photos. Sends original document
+        and photos to analysis server.
+      parameters:
+      - description: Document hash
+        in: formData
+        name: hash
+        required: true
+        type: string
+      - description: Photos of the document (multiple files allowed)
+        in: formData
+        name: photos
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Comparison result
+          schema:
+            $ref: '#/definitions/entity.CompareDocumentResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "404":
+          description: Document not found
+          schema:
+            $ref: '#/definitions/errs.Error'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/errs.Error'
+      security:
+      - BearerAuth: []
+      summary: Compare document with photos
       tags:
       - documents
   /documents/verify:

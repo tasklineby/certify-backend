@@ -301,3 +301,149 @@ func (h *DocumentHandler) GetHistory(c *gin.Context) {
 
 	c.JSON(http.StatusOK, history)
 }
+
+// CompareWithPhotos godoc
+// @Summary      Compare document with photos
+// @Description  Compare a document with uploaded photos. Sends original document and photos to analysis server.
+// @Tags         documents
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        hash      formData  string  true  "Document hash"
+// @Param        photos    formData  file    true  "Photos of the document (multiple files allowed)"
+// @Success      200       {object}  entity.CompareDocumentResponse  "Comparison result"
+// @Failure      400       {object}  errs.Error                      "Invalid request"
+// @Failure      401       {object}  errs.Error                      "Unauthorized"
+// @Failure      404       {object}  errs.Error                      "Document not found"
+// @Failure      500       {object}  errs.Error                      "Internal server error"
+// @Router       /documents/compare/photos [post]
+func (h *DocumentHandler) CompareWithPhotos(c *gin.Context) {
+	companyID, err := getCompanyIDFromContext(c)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	userID, err := getUserIDFromContext(c)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	hash := c.PostForm("hash")
+	if hash == "" {
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("hash is required", nil))
+		return
+	}
+
+	// Get multiple photos from form
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("invalid multipart form", err))
+		return
+	}
+
+	files := form.File["photos"]
+	if len(files) == 0 {
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("at least one photo is required", nil))
+		return
+	}
+
+	var photos [][]byte
+	for _, fileHeader := range files {
+		file, err := fileHeader.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errs.InternalError("failed to open photo", err))
+			return
+		}
+
+		data, err := io.ReadAll(file)
+		file.Close()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, errs.InternalError("failed to read photo", err))
+			return
+		}
+
+		photos = append(photos, data)
+	}
+
+	doc, status, message, analysis, err := h.documentService.CompareWithPhotos(c.Request.Context(), hash, userID, companyID, photos)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	c.JSON(http.StatusOK, entity.CompareDocumentResponse{
+		Status:   status,
+		Message:  message,
+		Document: doc,
+		Analysis: analysis,
+	})
+}
+
+// CompareWithPDF godoc
+// @Summary      Compare document with PDF
+// @Description  Compare a document with an uploaded PDF file. Sends both documents to analysis server.
+// @Tags         documents
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        hash      formData  string  true  "Document hash"
+// @Param        file      formData  file    true  "PDF file to compare"
+// @Success      200       {object}  entity.CompareDocumentResponse  "Comparison result"
+// @Failure      400       {object}  errs.Error                      "Invalid request"
+// @Failure      401       {object}  errs.Error                      "Unauthorized"
+// @Failure      404       {object}  errs.Error                      "Document not found"
+// @Failure      500       {object}  errs.Error                      "Internal server error"
+// @Router       /documents/compare/pdf [post]
+func (h *DocumentHandler) CompareWithPDF(c *gin.Context) {
+	companyID, err := getCompanyIDFromContext(c)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	userID, err := getUserIDFromContext(c)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	hash := c.PostForm("hash")
+	if hash == "" {
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("hash is required", nil))
+		return
+	}
+
+	file, _, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errs.BadRequestError("PDF file is required", err))
+		return
+	}
+	defer file.Close()
+
+	pdfData, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, errs.InternalError("failed to read PDF file", err))
+		return
+	}
+
+	doc, status, message, analysis, err := h.documentService.CompareWithPDF(c.Request.Context(), hash, userID, companyID, pdfData)
+	if err != nil {
+		errCast := errs.ErrorCast(err)
+		c.JSON(errCast.StatusCode(), errCast)
+		return
+	}
+
+	c.JSON(http.StatusOK, entity.CompareDocumentResponse{
+		Status:   status,
+		Message:  message,
+		Document: doc,
+		Analysis: analysis,
+	})
+}

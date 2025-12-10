@@ -49,6 +49,8 @@ func InitRoutes(
 	protectedDocumentApi.GET("", documentHandler.GetCompanyDocuments)
 	protectedDocumentApi.POST("", documentHandler.CreateDocument)
 	protectedDocumentApi.GET("/verify", documentHandler.VerifyDocument)
+	protectedDocumentApi.POST("/compare/photos", documentHandler.CompareWithPhotos)
+	protectedDocumentApi.POST("/compare/pdf", documentHandler.CompareWithPDF)
 	protectedDocumentApi.GET("/:id", documentHandler.GetDocument)
 	protectedDocumentApi.GET("/:id/file", documentHandler.DownloadFile)
 
