@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/tasklineby/certify-backend/entity"
 )
@@ -17,71 +18,32 @@ const (
 	geminiAPIURL = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
 
 	// DocumentComparisonPrompt is the prompt sent to Gemini for document comparison
-	DocumentComparisonPrompt = `You are a document verification expert specializing in detecting differences and potential forgeries. Compare the provided documents with extreme attention to detail.
+	DocumentComparisonPrompt = `You are a document verification expert. Compare the ORIGINAL document (first) with the PROVIDED document (second).
 
-TASK: Compare the ORIGINAL document with the PROVIDED document(s) and identify ALL differences.
+ALWAYS provide a detailed response. Analyze:
+- Text differences (names, dates, numbers, addresses)
+- Visual differences (logos, signatures, stamps, layout)
+- Signs of tampering or forgery
 
-ANALYZE THESE ASPECTS AND HIGHLIGHT SPECIFIC DIFFERENCES:
-
-1. **TEXT CONTENT**
-   - Compare every text field, number, date, name, address
-   - Note exact differences: "Field X shows 'ABC' in original but 'ABD' in provided"
-   - Flag missing or added text sections
-
-2. **LAYOUT & FORMATTING**
-   - Document structure, margins, spacing
-   - Font types, sizes, colors
-   - Table structures and cell positions
-
-3. **VISUAL ELEMENTS**
-   - Logos: position, size, clarity, color accuracy
-   - Signatures: presence, position, appearance
-   - Stamps/seals: placement, clarity, authenticity markers
-   - Watermarks and security features
-
-4. **TAMPERING INDICATORS**
-   - Pixel inconsistencies, blur patterns around text/images
-   - Misaligned elements, uneven lighting/shadows
-   - Copy-paste artifacts, font inconsistencies
-   - EXIF data anomalies (if detectable)
-
-5. **QUALITY ASSESSMENT**
-   - Image resolution comparison
-   - Scanning artifacts vs digital manipulation
-   - Color profile consistency
-
-RESPOND ONLY WITH VALID JSON in the following format:
+Return this JSON structure:
 {
-  "score": <float between 0.0 and 1.0>,
-  "is_authentic": <boolean>,
-  "confidence": "<low|medium|high>",
+  "score": 0.0-1.0,
+  "is_authentic": true/false,
+  "confidence": "low|medium|high",
   "differences": [
-    {
-      "location": "<specific location in document, e.g. 'Header section', 'Bottom-right signature area', 'Line 3, Column 2'>",
-      "original_value": "<what appears in original document>",
-      "provided_value": "<what appears in provided document>",
-      "severity": "<minor|moderate|critical>",
-      "description": "<detailed explanation of the difference>"
-    }
+    {"location": "specific area", "original_value": "what original shows", "provided_value": "what provided shows", "severity": "minor|moderate|critical", "description": "explain the difference"}
   ],
   "findings": [
-    {
-      "category": "<text|layout|visual|tampering|quality>",
-      "description": "<specific finding with exact details>",
-      "severity": "<info|warning|critical>"
-    }
+    {"category": "text|layout|visual|tampering", "description": "what you found", "severity": "info|warning|critical"}
   ],
-  "summary": "<2-3 sentence summary: overall match quality, key differences found, recommendation>"
+  "summary": "2-3 sentences explaining overall comparison result and recommendation"
 }
 
-SCORING GUIDELINES:
-- 0.95-1.0: Identical documents (only compression/scan artifacts)
-- 0.85-0.94: Minor differences (formatting, quality loss)
-- 0.70-0.84: Moderate differences (some content variations)
-- 0.50-0.69: Significant differences (multiple content changes)
-- Below 0.50: Major discrepancies or likely forgery
-
-Be SPECIFIC in differences - include exact text, positions, measurements where possible.`
+IMPORTANT:
+- Score 0.95-1.0 = identical, 0.85-0.94 = minor diffs, 0.70-0.84 = moderate, <0.70 = major issues
+- ALWAYS include at least 1 finding explaining your analysis
+- ALWAYS write a summary even if documents match
+- If documents differ, list specific differences with exact values`
 )
 
 // GeminiClient handles communication with Gemini API for document analysis
@@ -175,22 +137,16 @@ func NewGeminiClient(apiKey, model string) *GeminiClient {
 func (c *GeminiClient) CompareDocumentsWithPhotos(ctx context.Context, originalPDF []byte, photos [][]byte) (*entity.DocumentAnalysisResult, *GeminiComparisonResponse, error) {
 	parts := []GeminiPart{
 		{Text: DocumentComparisonPrompt},
-		{Text: "\n\nORIGINAL DOCUMENT (PDF):"},
 		{
 			InlineData: &GeminiInlineData{
 				MimeType: "application/pdf",
 				Data:     base64.StdEncoding.EncodeToString(originalPDF),
 			},
 		},
-		{Text: "\n\nPROVIDED DOCUMENTS (Photos for verification):"},
 	}
 
 	// Add each photo
-	for i, photo := range photos {
-		parts = append(parts, GeminiPart{
-			Text: fmt.Sprintf("\n\nPhoto %d:", i+1),
-		})
-
+	for _, photo := range photos {
 		mimeType := detectImageMimeType(photo)
 		parts = append(parts, GeminiPart{
 			InlineData: &GeminiInlineData{
@@ -200,10 +156,6 @@ func (c *GeminiClient) CompareDocumentsWithPhotos(ctx context.Context, originalP
 		})
 	}
 
-	parts = append(parts, GeminiPart{
-		Text: "\n\nAnalyze and compare these documents. Respond with JSON only.",
-	})
-
 	return c.sendRequest(ctx, parts)
 }
 
@@ -211,21 +163,18 @@ func (c *GeminiClient) CompareDocumentsWithPhotos(ctx context.Context, originalP
 func (c *GeminiClient) CompareDocumentsWithPDF(ctx context.Context, originalPDF []byte, comparisonPDF []byte) (*entity.DocumentAnalysisResult, *GeminiComparisonResponse, error) {
 	parts := []GeminiPart{
 		{Text: DocumentComparisonPrompt},
-		{Text: "\n\nORIGINAL DOCUMENT (PDF):"},
 		{
 			InlineData: &GeminiInlineData{
 				MimeType: "application/pdf",
 				Data:     base64.StdEncoding.EncodeToString(originalPDF),
 			},
 		},
-		{Text: "\n\nPROVIDED DOCUMENT FOR VERIFICATION (PDF):"},
 		{
 			InlineData: &GeminiInlineData{
 				MimeType: "application/pdf",
 				Data:     base64.StdEncoding.EncodeToString(comparisonPDF),
 			},
 		},
-		{Text: "\n\nAnalyze and compare these documents. Respond with JSON only."},
 	}
 
 	return c.sendRequest(ctx, parts)
@@ -238,7 +187,7 @@ func (c *GeminiClient) sendRequest(ctx context.Context, parts []GeminiPart) (*en
 			{Parts: parts},
 		},
 		GenerationConfig: GeminiGenerationConfig{
-			Temperature:      0.1, // Low temperature for consistent, deterministic responses
+			Temperature:      0.1,
 			MaxOutputTokens:  2048,
 			ResponseMimeType: "application/json",
 		},
@@ -286,10 +235,15 @@ func (c *GeminiClient) sendRequest(ctx context.Context, parts []GeminiPart) (*en
 	}
 
 	// Parse the JSON response from Gemini
-	responseText := apiResp.Candidates[0].Content.Parts[0].Text
+	var sb strings.Builder
+	for _, part := range apiResp.Candidates[0].Content.Parts {
+		sb.WriteString(part.Text)
+	}
+
+	responseText := normalizeGeminiResponse(sb.String())
 
 	var comparisonResp GeminiComparisonResponse
-	if err := json.Unmarshal([]byte(responseText), &comparisonResp); err != nil {
+	if err := parseGeminiJSON(responseText, &comparisonResp); err != nil {
 		slog.Error("Failed to parse Gemini response as JSON", "response", responseText, "err", err)
 		return nil, nil, fmt.Errorf("failed to parse comparison response: %w", err)
 	}
@@ -355,4 +309,169 @@ func detectImageMimeType(data []byte) string {
 	default:
 		return "image/jpeg"
 	}
+}
+
+// normalizeGeminiResponse removes common formatting Gemini may add (e.g., code fences)
+// and trims whitespace so the JSON decoder receives a clean payload.
+func normalizeGeminiResponse(resp string) string {
+	resp = strings.TrimSpace(resp)
+
+	// Handle code fences ```json ... ```
+	if strings.HasPrefix(resp, "```") {
+		// Remove first fence line
+		if idx := strings.Index(resp, "\n"); idx != -1 {
+			resp = resp[idx+1:]
+		}
+		resp = strings.TrimPrefix(resp, "json")
+		resp = strings.TrimPrefix(resp, "JSON")
+		resp = strings.TrimSpace(resp)
+		// Remove trailing fence if present
+		resp = strings.TrimSuffix(resp, "```")
+		resp = strings.TrimSpace(resp)
+	}
+
+	return resp
+}
+
+// parseGeminiJSON attempts to unmarshal JSON and falls back to repairing
+// truncated JSON by closing unclosed brackets/braces.
+func parseGeminiJSON(responseText string, out any) error {
+	if err := json.Unmarshal([]byte(responseText), out); err == nil {
+		return nil
+	}
+
+	// Try to repair truncated JSON by closing open structures
+	repaired := repairTruncatedJSON(responseText)
+	if err := json.Unmarshal([]byte(repaired), out); err == nil {
+		slog.Warn("Parsed repaired JSON response", "original_len", len(responseText), "repaired_len", len(repaired))
+		return nil
+	}
+
+	return fmt.Errorf("invalid JSON response")
+}
+
+// repairTruncatedJSON attempts to fix truncated JSON by:
+// 1. Finding the last complete JSON element
+// 2. Closing any unclosed brackets/braces
+func repairTruncatedJSON(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) == 0 {
+		return "{}"
+	}
+
+	// Find position of last complete value (after a complete string, number, bool, null, }, or ])
+	runes := []rune(s)
+	inString := false
+	escaped := false
+	lastCompleteValue := 0
+
+	for i, r := range runes {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if r == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if r == '"' {
+			inString = !inString
+			if !inString {
+				// Just completed a string
+				lastCompleteValue = i + 1
+			}
+			continue
+		}
+		if !inString {
+			switch r {
+			case '}', ']':
+				lastCompleteValue = i + 1
+			case ',':
+				// Comma after a value means previous value was complete
+				lastCompleteValue = i
+			}
+		}
+	}
+
+	// If we're inside a string or have trailing incomplete content, truncate
+	if inString || lastCompleteValue < len(runes) {
+		// Check what's after lastCompleteValue
+		trailing := strings.TrimSpace(string(runes[lastCompleteValue:]))
+
+		// If trailing is just structural chars that need values, truncate
+		if trailing != "" && !strings.HasPrefix(trailing, "}") && !strings.HasPrefix(trailing, "]") {
+			s = string(runes[:lastCompleteValue])
+		}
+	}
+
+	// Remove trailing incomplete elements: comma, colon, or incomplete key
+	s = strings.TrimSpace(s)
+	for {
+		trimmed := false
+		// Remove trailing comma
+		if strings.HasSuffix(s, ",") {
+			s = strings.TrimSuffix(s, ",")
+			s = strings.TrimSpace(s)
+			trimmed = true
+		}
+		// Remove trailing colon (incomplete key-value)
+		if strings.HasSuffix(s, ":") {
+			// Find and remove the key too
+			s = strings.TrimSuffix(s, ":")
+			s = strings.TrimSpace(s)
+			// Remove the key string
+			if strings.HasSuffix(s, "\"") {
+				idx := strings.LastIndex(s[:len(s)-1], "\"")
+				if idx >= 0 {
+					s = strings.TrimSpace(s[:idx])
+				}
+			}
+			// Remove comma before the removed key if present
+			s = strings.TrimSuffix(s, ",")
+			s = strings.TrimSpace(s)
+			trimmed = true
+		}
+		if !trimmed {
+			break
+		}
+	}
+
+	// Now close any unclosed brackets/braces
+	var stack []rune
+	inString = false
+	escaped = false
+
+	for _, r := range s {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if r == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if r == '"' {
+			inString = !inString
+			continue
+		}
+		if !inString {
+			switch r {
+			case '{':
+				stack = append(stack, '}')
+			case '[':
+				stack = append(stack, ']')
+			case '}', ']':
+				if len(stack) > 0 {
+					stack = stack[:len(stack)-1]
+				}
+			}
+		}
+	}
+
+	// Close unclosed structures in reverse order
+	for i := len(stack) - 1; i >= 0; i-- {
+		s += string(stack[i])
+	}
+
+	return s
 }
