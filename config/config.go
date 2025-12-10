@@ -12,6 +12,12 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	Jwt      JwtConfig
+	Gemini   GeminiConfig
+}
+
+type GeminiConfig struct {
+	APIKey string `mapstructure:"GEMINI_API_KEY"`
+	Model  string `mapstructure:"GEMINI_MODEL"`
 }
 
 type ServerConfig struct {
@@ -72,6 +78,15 @@ func LoadConfig(path string) (*Config, error) {
 			AccessTokenTTL:    viper.GetDuration("ACCESS_TOKEN_TTL_MINUTES"),
 			RefreshTokenTTL:   viper.GetDuration("REFRESH_TOKEN_TTL_HOURS"),
 		},
+		Gemini: GeminiConfig{
+			APIKey: viper.GetString("GEMINI_API_KEY"),
+			Model:  viper.GetString("GEMINI_MODEL"),
+		},
+	}
+
+	// Set default Gemini model if not specified
+	if cfg.Gemini.Model == "" {
+		cfg.Gemini.Model = "gemini-1.5-flash"
 	}
 
 	return cfg, nil

@@ -158,11 +158,33 @@ type DocumentHashPayload struct {
 	Name      string `json:"name"`
 }
 
+// DocumentDifference represents a specific difference found between documents
+// @Description Specific difference detected between original and provided document
+type DocumentDifference struct {
+	Location      string `json:"location" example:"Header section"`
+	OriginalValue string `json:"original_value" example:"John Smith"`
+	ProvidedValue string `json:"provided_value" example:"John Smth"`
+	Severity      string `json:"severity" example:"moderate"`
+	Description   string `json:"description" example:"Name field has a typo - missing letter i"`
+}
+
+// AnalysisFinding represents a general finding from document analysis
+// @Description General observation or finding from the analysis
+type AnalysisFinding struct {
+	Category    string `json:"category" example:"text"`
+	Description string `json:"description" example:"Minor text differences detected in footer"`
+	Severity    string `json:"severity" example:"warning"`
+}
+
 // DocumentAnalysisResult represents the result of document comparison analysis
 // @Description Analysis result comparing uploaded document/photos with original
 type DocumentAnalysisResult struct {
-	Score   float64 `json:"score" example:"0.95"`
-	Message string  `json:"message" example:"Documents match with 95% confidence"`
+	Score       float64              `json:"score" example:"0.95"`
+	IsAuthentic bool                 `json:"is_authentic" example:"true"`
+	Confidence  string               `json:"confidence" example:"high"`
+	Differences []DocumentDifference `json:"differences,omitempty"`
+	Findings    []AnalysisFinding    `json:"findings,omitempty"`
+	Summary     string               `json:"summary" example:"Documents match with 95% confidence. Minor formatting differences detected."`
 }
 
 // CompareDocumentResponse represents the response for document comparison

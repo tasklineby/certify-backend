@@ -31,12 +31,22 @@ type DocumentService interface {
 type documentService struct {
 	documentRepo pg.DocumentRepository
 	historyRepo  pg.HistoryRepository
+	geminiClient *GeminiClient
 }
 
-func NewDocumentService(documentRepo pg.DocumentRepository, historyRepo pg.HistoryRepository) DocumentService {
+func NewDocumentService(documentRepo pg.DocumentRepository, historyRepo pg.HistoryRepository, geminiAPIKey, geminiModel string) DocumentService {
+	var geminiClient *GeminiClient
+	if geminiAPIKey != "" {
+		geminiClient = NewGeminiClient(geminiAPIKey, geminiModel)
+		slog.Info("Gemini client initialized", "model", geminiModel)
+	} else {
+		slog.Warn("Gemini API key not provided, document comparison will use mock responses")
+	}
+
 	return &documentService{
 		documentRepo: documentRepo,
 		historyRepo:  historyRepo,
+		geminiClient: geminiClient,
 	}
 }
 
@@ -200,11 +210,39 @@ func (s *documentService) CompareWithPhotos(ctx context.Context, hash string, us
 		return doc, status, message, nil, nil
 	}
 
-	// Send to external analysis server
-	analysis, err := analyzeDocumentWithPhotos(doc.FileData, photos)
-	if err != nil {
-		slog.Error("error analyzing document with photos", "err", err)
-		return nil, entity.DocumentStatusRed, "Error analyzing document", nil, errs.InternalError("error analyzing document", err)
+	// Send to Gemini for analysis
+	var analysis *entity.DocumentAnalysisResult
+	if s.geminiClient != nil {
+		var geminiErr error
+		analysis, _, geminiErr = s.geminiClient.CompareDocumentsWithPhotos(ctx, doc.FileData, photos)
+		if geminiErr != nil {
+			slog.Error("error analyzing document with photos via Gemini", "err", geminiErr)
+			return nil, entity.DocumentStatusRed, "Error analyzing document", nil, errs.InternalError("error analyzing document", geminiErr)
+		}
+	} else {
+		// Fallback to mock if Gemini not configured
+		analysis = &entity.DocumentAnalysisResult{
+			Score:       0.92,
+			IsAuthentic: true,
+			Confidence:  "high",
+			Differences: []entity.DocumentDifference{
+				{
+					Location:      "Footer section",
+					OriginalValue: "Page 1 of 2",
+					ProvidedValue: "Page 1",
+					Severity:      "minor",
+					Description:   "Page numbering format differs slightly",
+				},
+			},
+			Findings: []entity.AnalysisFinding{
+				{
+					Category:    "quality",
+					Description: "Photo quality is slightly lower than original PDF",
+					Severity:    "info",
+				},
+			},
+			Summary: "Documents match with 92% confidence. Minor differences detected in formatting. (Mock response - Gemini not configured)",
+		}
 	}
 
 	return doc, status, message, analysis, nil
@@ -223,50 +261,32 @@ func (s *documentService) CompareWithPDF(ctx context.Context, hash string, userI
 		return doc, status, message, nil, nil
 	}
 
-	// Send to external analysis server
-	analysis, err := analyzeDocumentWithPDF(doc.FileData, pdfData)
-	if err != nil {
-		slog.Error("error analyzing document with PDF", "err", err)
-		return nil, entity.DocumentStatusRed, "Error analyzing document", nil, errs.InternalError("error analyzing document", err)
+	// Send to Gemini for analysis
+	var analysis *entity.DocumentAnalysisResult
+	if s.geminiClient != nil {
+		var geminiErr error
+		analysis, _, geminiErr = s.geminiClient.CompareDocumentsWithPDF(ctx, doc.FileData, pdfData)
+		if geminiErr != nil {
+			slog.Error("error analyzing document with PDF via Gemini", "err", geminiErr)
+			return nil, entity.DocumentStatusRed, "Error analyzing document", nil, errs.InternalError("error analyzing document", geminiErr)
+		}
+	} else {
+		// Fallback to mock if Gemini not configured
+		analysis = &entity.DocumentAnalysisResult{
+			Score:       0.98,
+			IsAuthentic: true,
+			Confidence:  "high",
+			Differences: []entity.DocumentDifference{},
+			Findings: []entity.AnalysisFinding{
+				{
+					Category:    "quality",
+					Description: "Both documents are high-quality PDFs with matching content",
+					Severity:    "info",
+				},
+			},
+			Summary: "Documents match with 98% confidence. Documents are nearly identical. (Mock response - Gemini not configured)",
+		}
 	}
 
 	return doc, status, message, analysis, nil
-}
-
-// analyzeDocumentWithPhotos is a mock function that simulates sending document and photos to an external server
-// TODO: Replace with actual external API call
-func analyzeDocumentWithPhotos(originalPDF []byte, photos [][]byte) (*entity.DocumentAnalysisResult, error) {
-	// Mock implementation - in real scenario, this would:
-	// 1. Send originalPDF and photos to an external analysis server
-	// 2. The server would compare the photos with the original document
-	// 3. Return similarity score and detailed message
-
-	slog.Info("mock: analyzing document with photos",
-		"original_size", len(originalPDF),
-		"photo_count", len(photos))
-
-	// Simulate analysis result
-	return &entity.DocumentAnalysisResult{
-		Score:   0.92,
-		Message: "Documents match with 92% confidence. Minor differences detected in formatting.",
-	}, nil
-}
-
-// analyzeDocumentWithPDF is a mock function that simulates sending two PDFs to an external server for comparison
-// TODO: Replace with actual external API call
-func analyzeDocumentWithPDF(originalPDF []byte, uploadedPDF []byte) (*entity.DocumentAnalysisResult, error) {
-	// Mock implementation - in real scenario, this would:
-	// 1. Send both PDFs to an external analysis server
-	// 2. The server would compare the documents
-	// 3. Return similarity score and detailed message
-
-	slog.Info("mock: analyzing document with PDF",
-		"original_size", len(originalPDF),
-		"uploaded_size", len(uploadedPDF))
-
-	// Simulate analysis result
-	return &entity.DocumentAnalysisResult{
-		Score:   0.98,
-		Message: "Documents match with 98% confidence. Documents are nearly identical.",
-	}, nil
 }

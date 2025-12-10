@@ -83,7 +83,7 @@ func main() {
 	)
 	userService := service.NewUserService(userRepo, companyRepo)
 	authService := service.NewAuthService(userService, tokenRepo, jwtService)
-	documentService := service.NewDocumentService(documentRepo, historyRepo)
+	documentService := service.NewDocumentService(documentRepo, historyRepo, cfg.Gemini.APIKey, cfg.Gemini.Model)
 
 	userHandler := handlers.NewUserHandler(userService, jwtService, tokenRepo)
 	authHandler := handlers.NewAuthHandler(authService)
